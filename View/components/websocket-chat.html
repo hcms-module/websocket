@@ -1,0 +1,277 @@
+{hcmstag:include file="websocket@/components/websocket-chat-mixin"}
+{hcmstag:include file="websocket@/components/websocket-chat-msg"}
+{hcmstag:include file="admin@/components/upload/select-image"}
+<script type="text/x-template" id="websocket-chat">
+    <div class="ws-container" id="ws-container">
+        <el-container>
+            <el-aside width="100px">
+                <div>
+                    <div class="ws-header">
+                        <div style="display: flex;align-items: center;justify-content: space-between;padding:0 10px;">
+                            <div>
+                                接待对象
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div style="padding: 0 20px;">
+                    <div v-for="(item,index) in ws_room_list" :key="index" style="padding-bottom: 10px;">
+                        <el-link :underline="false" @click="selectRoom(item)"
+                                 :type="ws_room===item.ws_room?'primary':'default'">{{item.ws_room_name}}
+                        </el-link>
+                    </div>
+                </div>
+            </el-aside>
+            <el-container>
+                <el-header style="height: 20px;">
+                    <div class="ws-header">
+                        <div style="display: flex;align-items: center;justify-content: space-between;padding:0 10px;">
+                            <div>
+                                {{ws_room_object.ws_room_name?ws_room_object.ws_room_name:'请选择接待对象'}}
+                            </div>
+                            <div>
+                                <i @click="closeWinEvent" style="font-size: 18px;" class="el-icon-close"></i>
+                            </div>
+                        </div>
+                    </div>
+                </el-header>
+                <el-main>
+                    <div class="ws">
+                        <div class="win" id="ws-win">
+                            <div v-if="!ws_connected" class="disconnect">
+                                <div class="alert">
+                                    <div>当前聊天连接属于断开状态，点击重连进行连接请求。</div>
+                                    <div style="margin-top: 10px;text-align: right;">
+                                        <el-button @click="wsInit()" type="primary" size="small">重连</el-button>
+                                    </div>
+                                </div>
+                            </div>
+                            <div v-for="(item,index) in msg_list" :key="index">
+                                <template v-if="item.type=='text'">
+                                    <websocket-chat-msg-text :msg="item"></websocket-chat-msg-text>
+                                </template>
+                                <template v-if="item.type=='image'">
+                                    <websocket-chat-msg-image :msg="item"></websocket-chat-msg-image>
+                                </template>
+                            </div>
+                        </div>
+                        <div v-if="is_scroll" class="back-bottom">
+                            <div @click="scrollBottom(true)">
+                                点击回到底部
+                            </div>
+                        </div>
+                        <div class="bottom">
+                            <el-form size="small">
+                                <el-form-item>
+                                    <div style="display: flex;align-items: center;justify-content: space-between;padding: 10px 5px">
+                                        <el-input :rows="1" type="textarea" v-model="input_text"></el-input>
+                                        <i @click="show_select_image=true"
+                                           class="el-icon-picture-outline image-button"></i>
+                                        <el-button type="primary" @click="sendTextMsg">发送</el-button>
+                                    </div>
+                                </el-form-item>
+                            </el-form>
+                        </div>
+                    </div>
+
+                </el-main>
+            </el-container>
+        </el-container>
+        <div v-if="is_close" class="open-icon">
+            <el-badge :value="new_msg_count" :hidden="new_msg_count==0" class="item">
+                <i @click="openWinEvent" style="font-size: 30px;" class="el-icon-chat-line-round"></i>
+            </el-badge>
+        </div>
+        <select-image :show="show_select_image" @confirm="selectImageConfirm"
+                      @close="show_select_image=false"></select-image>
+    </div>
+</script>
+
+<script>
+    $(function () {
+        Vue.component('websocket-chat', {
+            template: '#websocket-chat',
+            mixins: [window.__websocket_chat_mixin],
+            props: {
+                ws_host: {
+                    type: String,
+                    default: ""
+                },
+                ws_user_target: {
+                    type: String,
+                    default: ""
+                }, //用户标识，可以是登录用token等
+            },
+            data() {
+                return {
+                    ws_room_list: [
+                        {
+                            ws_room: 'ws_room1',
+                            ws_room_name: '张三'
+                        },
+                        {
+                            ws_room: 'ws_room2',
+                            ws_room_name: '李四'
+                        },
+                        {
+                            ws_room: 'ws_room3',
+                            ws_room_name: '王五'
+                        }
+                    ],
+                    ws_room: '',
+                    is_close: false,
+                    show_select_image: false,
+                    input_text: "",
+                    ws_transports: ["websocket"],
+                    ws_namespace: '/chat'
+                }
+            },
+            computed: {
+                ws_room_object() {
+                    let ws_room = this.ws_room_list.find(item => {
+                        return item.ws_room === this.ws_room
+                    })
+                    return ws_room ? ws_room : {}
+                }
+            },
+            mounted() {
+                this.wsInit()
+            },
+            methods: {
+                selectRoom(item) {
+                    this.msg_list = []
+                    this.ws_room = item.ws_room
+                    if (this.ws_room) {
+                        this.wsJoinRoom(this.ws_room)
+                    }
+                },
+                openWinEvent() {
+                    let ele = $('#ws-container')
+                    ele.animate({right: "0px"}, () => {
+                        this.is_close = false
+                    })
+                    if (this.new_msg_count) {
+                        //如果打开窗口有未读消息，则默认滚动到底部
+                        setTimeout(() => {
+                            this.scrollBottom(true)
+                        }, 500)
+                    }
+                    this.new_msg_count = 0
+                },
+                closeWinEvent() {
+                    this.new_msg_count = 0
+                    let ele = $('#ws-container')
+                    ele.animate({right: "-495px"}, () => {
+                        this.is_close = true
+                    })
+                },
+                selectImageConfirm(files) {
+                    console.log('selectImageConfirm', files)
+                    if (files.length > 0) {
+                        files.forEach(file => {
+                            this.wsSendImageMsg(file.file_url)
+                        })
+                    }
+                },
+                sendTextMsg() {
+                    let msg_content = this.input_text
+                    if (!msg_content) {
+                        this.$message.error('请输入发送内容')
+                        return
+                    }
+                    this.wsSendTextMsg(msg_content)
+                    this.input_text = ''
+                },
+            }
+        });
+    })
+</script>
+<style>
+    .win .disconnect .alert {
+        background-color: #ffffff;
+        width: 280px;
+        border-radius: 12px;
+        margin-left: 37px;
+        margin-top: 60%;
+        padding: 10px;
+    }
+
+    .win .disconnect {
+        position: absolute;
+        top: 0;
+        left: 0;
+        height: 100vh;
+        width: 100%;
+        background-color: rgba(0, 0, 0, 0.3);
+        z-index: 999;
+    }
+
+    .win {
+        background-color: #f8f8f8;
+        height: 570px;
+        overflow-y: auto;
+
+    }
+
+    .ws .el-form-item--small {
+        margin-bottom: 0;
+    }
+
+    .ws .back-bottom {
+        position: absolute;
+        right: 10px;
+        bottom: 80px;
+        background-color: #FFFFFF;
+        padding: 5px 10px;
+        border-radius: 6px;
+        font-size: 14px;
+        cursor: pointer;
+    }
+
+    .ws .bottom .image-button {
+        font-size: 28px;
+        margin: 0 10px;
+        cursor: pointer;
+    }
+
+    .ws {
+        position: relative;
+        width: 375px;
+        border: 1px solid #f8f8f8;
+    }
+
+    .open-icon {
+        position: absolute;
+        left: -55px;
+        bottom: 40px;
+        background: #ffffff;
+        padding: 10px;
+        border-radius: 100%;
+    }
+
+    .ws-header {
+        text-align: center;
+        padding-bottom: 10px;
+        font-weight: bold;
+    }
+
+    .ws-container {
+        position: fixed;
+        bottom: 30px;
+        right: 0;
+        background: #ffffff;
+        padding: 10px;
+        border-radius: 12px;
+        box-shadow: 0 2px 12px 0 rgb(0 0 0 / 10%);
+        z-index: 2000;
+    }
+
+    .ws-container .el-header {
+        padding: 0;
+    }
+
+    .ws-container .el-main {
+        padding: 0;
+        margin-top: 10px;
+    }
+</style>

@@ -1,0 +1,73 @@
+<div class="page-container" v-cloak>
+    <el-card>
+        <div slot="header" class="breadcrumb">
+            <el-breadcrumb separator="/">
+                <el-breadcrumb-item>当前连接</el-breadcrumb-item>
+            </el-breadcrumb>
+        </div>
+        <div style="margin-bottom: 10px;">
+            <el-alert
+                    title="每个连接默认加入自己socket id的房间"
+                    type="success"
+                    :closable="false">
+            </el-alert>
+        </div>
+        <div>
+            <el-table
+                    size="small"
+                    :data="client_list"
+                    style="width: 100%">
+                <el-table-column
+                        fixed
+                        prop="client"
+                        label="socket id"
+                        min-width="180">
+                </el-table-column>
+                <el-table-column
+                        prop="name"
+                        label="加入房间"
+                        min-width="180">
+                    <template slot-scope="{row}">
+                        <div v-for="(item,index) in row.room_list" :key="index">
+                            {{item}}
+                        </div>
+                    </template>
+                </el-table-column>
+            </el-table>
+        </div>
+
+    </el-card>
+    <websocket-chat ws_host="{$domain}" ws_user_target="{$user_token}"></websocket-chat>
+</div>
+{hcmstag:include file="websocket@/components/websocket-chat"}
+
+<!-- 引入 socket-io js 代码，注意重复引用的问题-->
+<script src="https://cdn.bootcss.com/socket.io/2.3.0/socket.io.js"></script>
+<script>
+    $(function () {
+        new Vue({
+            el: ".page-container",
+            data: {
+                client_list: []
+            },
+            mounted() {
+                this.socket = io("{$domain}", {transports: ['websocket']})
+                this.onRoomList()
+                setInterval(() => {
+                    this.getRoomList()
+                }, 1000)
+            },
+            methods: {
+                onRoomList() {
+                    this.socket.on('client_list', res => {
+                        let {client_list = []} = res
+                        this.client_list = client_list
+                    })
+                },
+                getRoomList() {
+                    this.socket.emit('client_list', {})
+                }
+            }
+        })
+    })
+</script>

@@ -1,0 +1,145 @@
+<!-- 引入 socket-io js 代码，注意重复引用的问题-->
+<script src="https://cdn.bootcss.com/socket.io/2.3.0/socket.io.js"></script>
+<script>
+    window.__websocket_chat_mixin = {
+        data() {
+            return {
+                msg_list: [],
+                msg_last_id: '',
+                loading_list: false,
+                is_scroll: false,
+                last_scroll_height: 0,
+                socket: {},
+                new_msg_count: 0,
+            }
+        },
+        computed: {
+            ws_connected() {
+                return this.socket.connected
+            }
+        },
+        methods: {
+            /**
+             *
+             * @param force 是否强制滚动到底部
+             */
+            scrollBottom(force = false) {
+                setTimeout(() => {
+                    let win_ele = document.getElementById('ws-win')
+                    if (win_ele.scrollHeight > win_ele.clientHeight && (!this.is_scroll || force)) {
+                        win_ele.scroll({top: win_ele.scrollHeight, left: 0, behavior: 'smooth'})
+                        this.is_scroll = false
+                    }
+                }, 300)
+            },
+            wsInit() {
+                this.socket = io(this.ws_host + this.ws_namespace, {transports: this.ws_transports})
+                this.msg_list = []
+                this.socket.on('connect', () => {
+                    this.wsJoinRoom(this.ws_room)
+                })
+                this.socket.on('disconnect', () => {
+                    console.log('disconnect')
+                    //断开链接
+                    this.socket = {}
+                });
+                this.socket.on('error', res => {
+                    //错误消息处理，当发送错误信息，怎么连接失败，需要重新
+                    console.log('error', res)
+                    this.socket.disconnect()
+                })
+                this.socket.on('event', res => {
+                    //事件反馈，后台事件触发，不一定都需要处理
+                    console.log('event', res)
+                })
+                this.socket.on('new_msg', msg => {
+                    this.msg_list.push(msg)
+                    this.new_msg_count += 1
+                    this.scrollBottom()
+                })
+                this.socket.on('lists', data => {
+                    let {lists = [], last_id = ''} = data
+                    if (lists.length > 0) {
+                        this.msg_list = [...lists.reverse(), ...this.msg_list,]
+                        //最后一条消息msg_id，作为翻页的依据
+                        this.msg_last_id = last_id
+                        //触发滚动到底部
+                        this.scrollBottom()
+                        this.loading_list = false
+
+                        //滚动到原来加载的位置
+                        setTimeout(() => {
+                            let win_ele = document.getElementById('ws-win')
+                            // console.log('win_ele.scrollHeight-scrollHeight', win_ele.scrollHeight - this.last_scroll_height)
+                            win_ele.scrollTop = win_ele.scrollHeight - this.last_scroll_height
+                        }, 200)
+                    }
+                })
+                //监听窗口滚动事件
+                this.wsScrollTouchTop()
+            },
+            wsScrollTouchTop() {
+                let win_ele = document.getElementById('ws-win')
+                win_ele.addEventListener('scroll', () => {
+                    let win_ele = document.getElementById('ws-win')
+                    this.is_scroll = win_ele.scrollHeight > win_ele.clientHeight && (win_ele.scrollHeight - win_ele.scrollTop) > 825
+                    if (this.loading_list) {
+                        return
+                    }
+                    if (win_ele.scrollHeight > win_ele.clientHeight && win_ele.scrollTop === 0) {
+                        win_ele.scrollTop = 1
+                        console.log('scroll top', win_ele.scrollHeight)
+                        this.loading_list = true
+                        this.wsLoadMoreList(win_ele.scrollHeight)
+                    }
+                })
+            },
+            wsLoadMoreList(scrollHeight) {
+                this.last_scroll_height = scrollHeight
+                setTimeout(() => {
+                    this.wsEventEmit('lists', {
+                        'last_id': this.msg_last_id,
+                    })
+                }, 200)
+            },
+            wsEventEmit(event, data, callback) {
+                if (!this.ws_connected) {
+                    return
+                }
+                data = {
+                    ...data, ...{
+                        user_target: this.ws_user_target,
+                        room: this.ws_room
+                    }
+                }
+                this.socket.emit(event, data, callback);
+            },
+            wsSendMsg(type, msg) {
+                let data = {
+                    msg,
+                    room: this.ws_room
+                }
+                this.wsEventEmit(type, data)
+            },
+            wsSendImageMsg(image_url) {
+                let msg = {
+                    msg_content: {
+                        image_url
+                    }
+                }
+                this.wsSendMsg('image', msg)
+            },
+            wsSendTextMsg(msg_content = '') {
+                let msg = {
+                    msg_content
+                }
+                this.wsSendMsg('text', msg)
+                this.input_text = ''
+            },
+            wsJoinRoom(room) {
+                let data = {room}
+                this.wsEventEmit('join-room', data)
+            }
+        }
+    }
+</script>

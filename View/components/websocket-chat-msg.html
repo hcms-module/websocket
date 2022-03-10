@@ -1,0 +1,102 @@
+<!-- 图片消息 -->
+<script type="text/x-template" id="websocket-chat-msg-image">
+    <div class="websocket-chat-msg-image msg" :class="{'is_self':msg.is_self}">
+        <div v-if="!msg.is_self" class="avatar">
+            <img :src="msg.avatar" alt="">
+        </div>
+        <div class="content">
+            <div v-if="msg.msg_content.image_url">
+                <el-image :preview-src-list="[msg.msg_content.image_url]" class="content-image"
+                          :src="msg.msg_content.image_url"
+                          alt=""></el-image>
+            </div>
+            <span v-else>[图片无法浏览]</span>
+        </div>
+        <div v-if="msg.is_self" class="avatar">
+            <img :src="msg.avatar" alt="">
+        </div>
+    </div>
+</script>
+
+<script>
+    $(function () {
+        Vue.component('websocket-chat-msg-image', {
+            template: '#websocket-chat-msg-image',
+            props: {
+                msg: {},
+            },
+            data() {
+                return {}
+            },
+            computed: {},
+            methods: {}
+        });
+    })
+</script>
+
+<!-- 文本消息 -->
+<script type="text/x-template" id="websocket-chat-msg-text">
+    <div class="websocket-chat-msg-text msg" :class="{'is_self':msg.is_self}">
+        <div v-if="!msg.is_self" class="avatar">
+            <img :src="msg.avatar" alt="">
+        </div>
+        <div class="content">
+            <span>{{msg.msg_content}}</span>
+        </div>
+        <div v-if="msg.is_self" class="avatar">
+            <img :src="msg.avatar" alt="">
+        </div>
+    </div>
+</script>
+
+<script>
+    $(function () {
+        Vue.component('websocket-chat-msg-text', {
+            template: '#websocket-chat-msg-text',
+            props: {
+                msg: {},
+            },
+            data() {
+                return {}
+            },
+            computed: {},
+            methods: {}
+        });
+    })
+</script>
+
+<style>
+
+    .win .msg .content .content-image {
+        max-width: 200px;
+        max-height: 300px;
+        cursor: pointer;
+    }
+
+    .win .msg .content {
+        max-width: 280px;
+        line-height: 20px;
+        background-color: #FFFFFF;
+        margin: 0 10px;
+        border-radius: 6px;
+        padding: 5px 10px;
+        white-space: break-spaces;
+        word-break: break-word;
+    }
+
+    .win .msg .avatar img {
+        width: 30px;
+        height: 30px;
+    }
+
+    .win .msg {
+        display: flex;
+        align-items: flex-start;
+        justify-content: flex-start;
+        padding: 10px;
+    }
+
+    .win .is_self {
+        justify-content: flex-end;
+    }
+</style>
