@@ -106,6 +106,10 @@
                 if (!this.ws_connected) {
                     return
                 }
+                if (!this.ws_room) {
+                    //未选中聊天对象
+                    return
+                }
                 data = {
                     ...data, ...{
                         user_target: this.ws_user_target,
